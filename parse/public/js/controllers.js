@@ -18,18 +18,25 @@
 
 var democracyControllers = angular.module('democracy.controller', ['democracy.service']);
 
-democracyControllers.controller('MainController', [ '$scope', '$location', 'LoginService', function($scope, $location, LoginService) {
+democracyControllers.controller('MainController', [ '$scope', '$location',
+   'LoginService', function($scope, $location, LoginService) {
   $scope.loginService = LoginService;
 
+  // We use this function for selecting which tab that corresponds to our
+  // current route.
   $scope.isActive = function(route) {
     return route === $location.path();
   }
 }]);
 
 
-democracyControllers.controller('LoginController', ['$scope', '$location', 'LoginService', function($scope, $location, LoginService) {
+democracyControllers.controller('LoginController', ['$scope', '$location',
+   'LoginService', function($scope, $location, LoginService) {
   $scope.loginService = LoginService;
 
+  // The state decides if we shoould show the login or the signup fields. We can
+  // show the login view on multiple sub-pages, but only show signup on the
+  // dedlicated signup page.
   var states = {
     LOGIN: 0,
     SIGNUP: 1,
@@ -38,57 +45,31 @@ democracyControllers.controller('LoginController', ['$scope', '$location', 'Logi
   $scope.state = states;
   $scope.state.currentState = ($location.path() == '/signup') ? states.SIGNUP : states.LOGIN;
 
-  function redirectIfLoggedIn() {
+  // When the stateLoggedIn changes we check if we are on one of the dedlicated
+  // login pages and if we are then we redirect to the statistics page on a
+  // successful login.
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, function() {
     if (LoginService.stateLoggedIn == LoginService.LOGGED_IN) {
-      if ($location.path() == '/login') {
-        // If we already are logged in, goto the statistics page.
+      if (($location.path() == '/login') || ($location.path() == '/signup')) {
         $location.path('/statistics');
       }
     }
-  }
-  $scope.login = function() {
-    LoginService.login().then(function() {
-      $scope.$apply(redirectIfLoggedIn());
-    });
-  };
-  $scope.signup = function() {
-    LoginService.signup().then(function() {
-      $scope.$apply(redirectIfLoggedIn());
-    });
-  };
-  $scope.loginOrSignupFacebook = function() {
-    LoginService.loginOrSignupFacebook().then(function() {
-      $scope.$apply(redirectIfLoggedIn());
-    });
-  };
+  });
+
   $scope.loginAsGuest = function() {
     LoginService.username = 'Sandra';
     LoginService.password = 'guest';
-    LoginService.login().then(function() {
-      $scope.$apply(redirectIfLoggedIn());
-    });
+    LoginService.login();
   }
-
-  redirectIfLoggedIn();
 }]);
 
 
-democracyControllers.controller('AddPageController', ['$scope', '$rootScope', '$location', '$window', 'LoginService', function($scope, $rootScope, $location, $window, LoginService) {
+democracyControllers.controller('AddPageController', ['$scope', '$location',
+    '$window', 'LoginService',
+    function($scope, $location, $window, LoginService) {
   $scope.loginService = LoginService
-  $rootScope.pageAddCount = 0;
-
-  $scope.$watch(function() {
-    return $location.search();
-  }, function() {
-    var title = $location.search().title;
-    if (title) {
-      $scope.title = title;
-    }
-    var url = $location.search().url;
-    if (url) {
-      $scope.url = url;
-    }
-  });
 
   var indexOf = function(array, x) {
     var result = -1;
@@ -100,7 +81,6 @@ democracyControllers.controller('AddPageController', ['$scope', '$rootScope', '$
     }
     return result;
   }
-
 
   // Update user tags table 
   // Return promise when the tags are updated
@@ -209,7 +189,6 @@ democracyControllers.controller('AddPageController', ['$scope', '$rootScope', '$
           $scope.url = "";
           $scope.topic = undefined;
           $scope.addPageForm.$setPristine();
-          $rootScope.pageAddCount++;
           $scope.$apply();
           $window.history.back();
         }, function(error) {
@@ -289,12 +268,32 @@ democracyControllers.controller('AddPageController', ['$scope', '$rootScope', '$
     return tagIdList;
   }
 
-  getTags();
-  getTopics();
+  function queryPage() {
+    var title = $location.search().title;
+    if (title) {
+      $scope.title = title;
+    }
+    var url = $location.search().url;
+    if (url) {
+      $scope.url = url;
+    }
+
+    if (LoginService.stateLoggedIn == LoginService.LOGGED_IN) {
+      getTags();
+      getTopics();
+    }
+  }
+
+  $scope.$watch(function() {
+    return $location.search();
+  }, queryPage);
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
 
 
-democracyControllers.controller('ListPagesController', ['$scope', '$rootScope', 'LoginService', function($scope, $rootScope, LoginService) {
+democracyControllers.controller('ListPagesController', ['$scope', 'LoginService', function($scope, LoginService) {
   $scope.loginService = LoginService;
 
   function queryPage() {
@@ -344,11 +343,12 @@ democracyControllers.controller('ListPagesController', ['$scope', '$rootScope', 
     });
   }
   
-  $rootScope.$watch(function() { return LoginService.stateLoggedIn; }, queryPage);
-  $rootScope.$watch('pageAddCount', queryPage);
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
 
-democracyControllers.controller('StatisticsController', ['$scope', '$rootScope', 'LoginService', function($scope, $rootScope, LoginService) {
+democracyControllers.controller('StatisticsController', ['$scope', 'LoginService', function($scope, LoginService) {
   $scope.loginService = LoginService;
   $scope.tags = [];
   $scope.tagCount = 0;
@@ -383,108 +383,139 @@ democracyControllers.controller('StatisticsController', ['$scope', '$rootScope',
     });
   }
 
-  $rootScope.$watch(function() { return LoginService.stateLoggedIn; }, queryPage);
-  $rootScope.$watch('pageAddCount', queryPage);
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
 
-democracyControllers.controller('TagsPerDateController', ['$scope', '$rootScope', 'LoginService', function($scope, $rootScope, LoginService) {
+democracyControllers.controller('TagsPerDateController', ['$scope', 'LoginService', function($scope, LoginService) {
 
-  var currentUser = Parse.User.current();
-  var pageQuery = new Parse.Query("Page");
-  pageQuery.equalTo("user", currentUser);
-  pageQuery.include("positive_tags");
-  pageQuery.include("negative_tags");
+  function queryPage() {
+    if (LoginService.stateLoggedIn != LoginService.LOGGED_IN) {
+      return;
+    }
 
-  pageQuery.descending("createdAt");
+    var currentUser = Parse.User.current();
+    var pageQuery = new Parse.Query("Page");
+    pageQuery.equalTo("user", currentUser);
+    pageQuery.include("positive_tags");
+    pageQuery.include("negative_tags");
 
-  pageQuery.find().then(function(pages) {
-    var result = [];
-    for (var i = 0; i < pages.length; i++) {
-      var positiveTags = pages[i].get("positive_tags");
-      if (positiveTags) {
-        for (var j = 0; j < positiveTags.length; j++) {
-          var positiveTag = positiveTags[j];
-          if (positiveTag) {
-            var resultTag = {
-              id: positiveTag.id,
-              date: pages[i].createdAt,
-              name: positiveTag.get("name"),
-              score: 1
-            };
-            result[result.length] = resultTag;
+    pageQuery.descending("createdAt");
+
+    pageQuery.find().then(function(pages) {
+      var result = [];
+      for (var i = 0; i < pages.length; i++) {
+        var positiveTags = pages[i].get("positive_tags");
+        if (positiveTags) {
+          for (var j = 0; j < positiveTags.length; j++) {
+            var positiveTag = positiveTags[j];
+            if (positiveTag) {
+              var resultTag = {
+                id: positiveTag.id,
+                date: pages[i].createdAt,
+                name: positiveTag.get("name"),
+                score: 1
+              };
+              result[result.length] = resultTag;
+            }
+          }
+        }
+
+        var negativeTags = pages[i].get("negative_tags");
+        if (negativeTags) {
+          for (var j = 0; j < negativeTags.length; j++) {
+            var negativeTag = negativeTags[j];
+            if (negativeTag) {
+              var resultTag = {
+                id: negativeTag.id,
+                date: pages[i].createdAt,
+                name: negativeTag.get("name"),
+                score: -1
+              };
+              result[result.length] = resultTag;
+            }
           }
         }
       }
 
-      var negativeTags = pages[i].get("negative_tags");
-      if (negativeTags) {
-        for (var j = 0; j < negativeTags.length; j++) {
-          var negativeTag = negativeTags[j];
-          if (negativeTag) {
-            var resultTag = {
-              id: negativeTag.id,
-              date: pages[i].createdAt,
-              name: negativeTag.get("name"),
-              score: -1
-            };
-            result[result.length] = resultTag;
-          }
-        }
+      // Format the data as csv
+      var csvResult = "id; date; name; score\n";
+      for (var i = 0; i < result.length; i++) {
+        csvResult += result[i].id + ";" + result[i].date + ";" + result[i].name + ";" + result[i].score + "\n";
       }
-    }
 
-    // Format the data as csv
-    var csvResult = "id; date; name; score\n";
-    for (var i = 0; i < result.length; i++) {
-      csvResult += result[i].id + ";" + result[i].date + ";" + result[i].name + ";" + result[i].score + "\n";
-    }
+      $scope.tags = csvResult;
+      $scope.$apply();
+    }, function (error) {
+      alert(error);
+    });
+  }
 
-    $scope.tags = csvResult;
-    $scope.$apply();
-  }, function (error) {
-    alert(error);
-  });
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
 
 
-democracyControllers.controller('AccumulatedTagsController', ['$scope', '$rootScope', 'LoginService', function($scope, $rootScope, LoginService) {
+democracyControllers.controller('AccumulatedTagsController', ['$scope',
+    'LoginService', function($scope, LoginService) {
 
-  var currentUser = Parse.User.current();
-  var userTagQuery = new Parse.Query("UserTag");
-  userTagQuery.equalTo("user", currentUser);
-
-  userTagQuery.find().then(function(userTags) {
-    var result = [];
-    for (var i = 0; i < userTags.length; i++) {
-      var resultTag = {
-        id: userTags[i].id,
-        name: userTags[i].get("name"),
-        score: userTags[i].get("negativeCount") + userTags[i].get("positiveCount")
-      };
-      result[result.length] = resultTag;
+  function queryPage() {
+    if (LoginService.stateLoggedIn != LoginService.LOGGED_IN) {
+      return;
     }
 
-    result.sort(function(a, b) { return b.score - a.score; });
+    var currentUser = Parse.User.current();
+    var userTagQuery = new Parse.Query("UserTag");
+    userTagQuery.equalTo("user", currentUser);
 
-    // Format the data as csv
-    var csvResult = "id; name; score\n";
-    for (var i = 0; i < result.length; i++) {
-      csvResult += result[i].id + ";" + result[i].name + ";" + result[i].score + "\n";
-    }
+    userTagQuery.find().then(function(userTags) {
+      var result = [];
+      for (var i = 0; i < userTags.length; i++) {
+        var resultTag = {
+          id: userTags[i].id,
+          name: userTags[i].get("name"),
+          score: userTags[i].get("negativeCount") + userTags[i].get("positiveCount")
+        };
+        result[result.length] = resultTag;
+      }
 
-    $scope.tags = csvResult;
-    $scope.$apply();
-  }, function (error) {
-    alert(error);
-  });
+      result.sort(function(a, b) { return b.score - a.score; });
+
+      // Format the data as csv
+      var csvResult = "id; name; score\n";
+      for (var i = 0; i < result.length; i++) {
+        csvResult += result[i].id + ";" + result[i].name + ";" + result[i].score + "\n";
+      }
+
+      $scope.tags = csvResult;
+      $scope.$apply();
+    }, function (error) {
+      alert(error);
+    });
+  }
+
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
 
-democracyControllers.controller('ListCollectionsController', ['$scope', '$rootScope', 'LoginService', function($scope, $rootScope, LoginService) {
+democracyControllers.controller('ListCollectionsController', ['$scope', 'LoginService', function($scope, LoginService) {
+  function queryPage() {
+    if (LoginService.stateLoggedIn != LoginService.LOGGED_IN) {
+      return;
+    }
 
-  Parse.Cloud.run('listCollections', {}).then(function(result) {
-    $scope.tags = result;
-    $scope.$apply();
-  }, function (error) {
-    alert(error);
-  });
+    Parse.Cloud.run('listCollections', {}).then(function(result) {
+      $scope.tags = result;
+      $scope.$apply();
+    }, function (error) {
+      alert(error);
+    });
+  }
+
+  $scope.$watch(function() {
+    return LoginService.stateLoggedIn;
+  }, queryPage);
 }]);
