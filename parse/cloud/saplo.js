@@ -54,6 +54,42 @@ function connectToSaplo() {
 }
 
 
+function saplo_text_relatedGroups(accessUrl, collection_id, text_id) {
+//Request
+  var request = {
+    method: 'text.relatedGroups', 
+    params: {
+      collection_id: collection_id,
+      text_id: text_id
+    }, 
+    id:0
+  };
+
+
+  return Parse.Cloud.httpRequest({
+    url: saploUrlWithToken,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(request)
+  }).then(function (httpResponse) {
+    if (httpResponse.status != 200) {
+      return Parse.Promise.error('saploConnectFailure: Saplo returned status: ' + httpResponse.status);
+    }
+
+    var requestObject = JSON.parse(httpResponse.text).result;
+    return Parse.Promise.as(requestObject.result.related_groups);
+  }); 
+}
+
+
+/**
+ * From a textId get list of topic tags and their relevance.
+ */
+function getTopicsForText(accessUrl, textId) {
+  textId = 
+}
+
+
 // Supported parameters in request object:
 // text:     The text to be tagged
 // url:      The url for the text (uesd for cache:ing)
