@@ -87,10 +87,17 @@ exports.createDefaultUsers = createDefaultUsers;
  */
 function createSaploGroups(request, response) {
   var saploAccessUrl;
+  var parseTags;
+  var saploGroups;
 
   // Connect to saplo so we get an accessUrl
   connectToSaplo().then(function (accessUrl) {
     saploAccessUrl = accessUrl;
+
+    // Retreieve the groups we already have created on Saplo
+    return saplo_group_list(saploAccessUrl);
+  }).then(function (groups) {
+    saploGroups = groups;
 
     // Iterate over the topic tags and create groups for each one
     var Tag = Parse.extend('Tag');
@@ -98,11 +105,28 @@ function createSaploGroups(request, response) {
     tagQuery.equals('type', 'topic');
     return tagQuery.find();
   }).then(function (tags) {
+    // Iterate over the topic tags, create saplo groups for the ones we don't
+    // already have.
     var groupCreatePromises = [];
-    for (var i = 0; i < tags.length; i++) {
-      var tag = tags[i];
-      groupCreatePromises[groupCreatePromises.length] = saplo_group_create(saploAccessUrl, tag.get('name'), 'sv');
+    for (var tagId = 0; tagId < tags.length; tagId++) {
+      var tag = tags[tagId];
+
+      // Check if we have a group for this topic
+      var haveGroupForTopic = false;
+      for (var groupId = 0; groupId < saploGroups.length; groupId++) {
+        if (saploGroups[groupId].name === tag.get('name')) {
+          haveGroupForTopic = true;
+          break;
+        }
+      }
+
+      if (!haveGroupForTopic) {
+        groupCreatePromises[groupCreatePromises.length]
+          = saplo_group_create(saploAccessUrl, tag.get('name'), 'sv');
+      }
     }
+
+    // TODO: Check if there are any groups we should remove
 
     return Parse.Promise.when(groupCreatePromises);
   }).then(function () {
