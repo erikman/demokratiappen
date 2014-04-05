@@ -54,30 +54,109 @@ function connectToSaplo() {
 }
 
 
-function saplo_text_relatedGroups(accessUrl, collection_id, text_id) {
-//Request
+/**
+ * @brief Wrapper around Saplo's text.relatedGroups function
+ *      
+ * The function returns an array of objects like:
+ * {
+ *   "group_id":12,
+ *   "name": "Technology",
+ *   "relevance":0.91,
+ * },
+ *
+ * @return Promise that will return an array with related groups
+ */
+function saplo_text_relatedGroups(accessUrl, collectionId, textId) {
   var request = {
     method: 'text.relatedGroups', 
     params: {
-      collection_id: collection_id,
-      text_id: text_id
+      collection_id: collectionId,
+      text_id: textId
     }, 
     id:0
   };
 
-
   return Parse.Cloud.httpRequest({
-    url: saploUrlWithToken,
+    url: accessUrl,
     method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify(request)
   }).then(function (httpResponse) {
     if (httpResponse.status != 200) {
-      return Parse.Promise.error('saploConnectFailure: Saplo returned status: ' + httpResponse.status);
+      return Parse.Promise.error('saplo_text_relatedGroups: Saplo returned status: ' + httpResponse.status);
     }
 
     var requestObject = JSON.parse(httpResponse.text).result;
     return Parse.Promise.as(requestObject.result.related_groups);
+  });
+}
+
+
+/**
+ * @brief Create Saplo group
+ *
+ * @return Promise when group is created
+ */
+function saplo_group_create(accessUrl, name, lang) {
+  var request = {
+    "method": "group.create", 
+    "params": {
+      "name": name,
+      "language": lang
+    },
+    "id":0
+  };
+
+  return Parse.Cloud.httpRequest({
+    url: accessUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(request)
+  }).then(function (httpResponse) {
+    if (httpResponse.status != 200) {
+      return Parse.Promise.error('saplo_group_create: Saplo returned status: ' + httpResponse.status);
+    }
+
+    var requestObject = JSON.parse(httpResponse.text).result;
+    return Parse.Promise.as(requestObject.result);
+  }); 
+}
+
+
+/**
+ * @brief List Saplo groups
+ *
+ * Each group looks like:
+ * {
+ *   "group_id":13,
+ *   "name":"My Tech Group",
+ *   "language":"en",
+ *   "description":"Group based on tech articles.",
+ *   "date_created":"2011-03-30T10:31:33z",
+ *   "date_updated":"2011-07-15T23:08:54z"
+ * },
+ *
+ * @return Promise with list of groups
+ */
+function saplo_group_list(accessUrl) {
+  var request = {
+    "method": "group.list", 
+    "params": {},
+    "id":0
+  };
+
+  return Parse.Cloud.httpRequest({
+    url: accessUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(request)
+  }).then(function (httpResponse) {
+    if (httpResponse.status != 200) {
+      return Parse.Promise.error('saplo_group_create: Saplo returned status: ' + httpResponse.status);
+    }
+
+    var requestObject = JSON.parse(httpResponse.text).result.groups;
+    return Parse.Promise.as(requestObject.result);
   }); 
 }
 
@@ -85,8 +164,12 @@ function saplo_text_relatedGroups(accessUrl, collection_id, text_id) {
 /**
  * From a textId get list of topic tags and their relevance.
  */
-function getTopicsForText(accessUrl, textId) {
-  textId = 
+function getTopicsForText(accessUrl, collectionId, textId) {
+  saplo_text_relatedGroups(accessUrl, collectionId, textId).then(function (relatedGroups) {
+    // Remove
+    for (
+
+  });
 }
 
 

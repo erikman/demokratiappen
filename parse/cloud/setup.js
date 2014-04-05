@@ -72,3 +72,43 @@ function createDefaultUsers(request, response) {
 }
 
 exports.createDefaultUsers = createDefaultUsers;
+
+
+/**
+ * Setup Saplo groups
+ *
+ * You can trigger this code using:
+ * curl -X POST \
+ * -H "X-Parse-Application-Id: p7Nu6RZkIlnGUfofyOvms99yDnehPjzHg18OuFra" \
+ * -H "X-Parse-REST-API-Key: W3seCkw5eOmPU3UhBM0zlzbSJ6W7fgAEGRtMpTzH" \
+ * -H "Content-Type: application/json" \
+ * -d '{}' \
+ * https://api.parse.com/1/functions/createSaploGroups
+ */
+function createSaploGroups(request, response) {
+  var saploAccessUrl;
+
+  // Connect to saplo so we get an accessUrl
+  connectToSaplo().then(function (accessUrl) {
+    saploAccessUrl = accessUrl;
+
+    // Iterate over the topic tags and create groups for each one
+    var Tag = Parse.extend('Tag');
+    var tagQuery = Parse.Query('Tag');
+    tagQuery.equals('type', 'topic');
+    return tagQuery.find();
+  }).then(function (tags) {
+    var groupCreatePromises = [];
+    for (var i = 0; i < tags.length; i++) {
+      var tag = tags[i];
+      groupCreatePromises[groupCreatePromises.length] = saplo_group_create(saploAccessUrl, tag.get('name'), 'sv');
+    }
+
+    return Parse.Promise.when(groupCreatePromises);
+  }).then(function () {
+    response.success("createSaploGroups: Completed successfully!");
+  }, function(error) {
+    console.error('createSaploGroups: Failed: ' + JSON.stringify(error));
+    response.error(error);
+  });
+}
